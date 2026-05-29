@@ -228,7 +228,35 @@ impl Parser {
             Some(Token::Ident(name)) => {
                 self.expect(&Token::LParen)?;
                 let args = self.parse_args()?;
-                Ok(Rule::Matcher(Matcher { name, args }))
+                let matcher_enum = match name.as_str() {
+                    "Host" => {
+                        assert!(args.len() == 1);
+                        Matcher::Host {
+                            host: args.into_iter().next().unwrap(),
+                        }
+                    }
+                    "Path" => {
+                        assert!(args.len() == 1);
+                        Matcher::Path {
+                            path: args.into_iter().next().unwrap(),
+                        }
+                    }
+                    "PathPrefix" => {
+                        assert!(args.len() == 1);
+                        Matcher::PathPrefix {
+                            path: args.into_iter().next().unwrap(),
+                        }
+                    }
+                    "PathRegexp" => {
+                        assert!(args.len() == 1);
+                        Matcher::PathRegexp {
+                            pattern: args.into_iter().next().unwrap(),
+                        }
+                    }
+                    _ => unimplemented!(),
+                };
+
+                Ok(Rule::Matcher(matcher_enum))
             }
             Some(token) => Err(ParseError::new(format!(
                 "expected a matcher or `(`, found {token:?}"
@@ -282,44 +310,37 @@ impl Parser {
 mod tests {
     use super::*;
 
-    fn matcher(name: &str, args: &[&str]) -> Rule {
-        Rule::Matcher(Matcher {
-            name: name.to_string(),
-            args: args.iter().map(|a| a.to_string()).collect(),
-        })
-    }
-
     #[test]
     fn single_matcher() {
-        let rule = Rule::parse("Host(`example.com`)").unwrap();
+        let rule = parse_rule("Host(`example.com`)").unwrap();
         assert_eq!(rule, matcher("Host", &["example.com"]));
     }
 
     #[test]
     fn multiple_arguments() {
-        let rule = Rule::parse("Header(`X-Foo`, `bar`)").unwrap();
+        let rule = parse_rule("Header(`X-Foo`, `bar`)").unwrap();
         assert_eq!(rule, matcher("Header", &["X-Foo", "bar"]));
     }
 
     #[test]
     fn escaped_double_quote_values() {
-        let rule = Rule::parse(r#"Host("example.com")"#).unwrap();
+        let rule = parse_rule(r#"Host("example.com")"#).unwrap();
         assert_eq!(rule, matcher("Host", &["example.com"]));
 
-        let rule = Rule::parse(r#"Header("X", "a\"b")"#).unwrap();
+        let rule = parse_rule(r#"Header("X", "a\"b")"#).unwrap();
         assert_eq!(rule, matcher("Header", &["X", "a\"b"]));
     }
 
     #[test]
     fn negation() {
-        let rule = Rule::parse("!Path(`/foo`)").unwrap();
+        let rule = parse_rule("!Path(`/foo`)").unwrap();
         assert_eq!(rule, Rule::Not(Box::new(matcher("Path", &["/foo"]))));
     }
 
     #[test]
     fn and_or_precedence() {
         // && binds tighter than ||, so this parses as a || (b && c).
-        let rule = Rule::parse("Host(`a`) || Host(`b`) && Path(`/c`)").unwrap();
+        let rule = parse_rule("Host(`a`) || Host(`b`) && Path(`/c`)").unwrap();
         assert_eq!(
             rule,
             Rule::Or(
@@ -334,7 +355,7 @@ mod tests {
 
     #[test]
     fn parentheses_override_precedence() {
-        let rule = Rule::parse("(Host(`a`) || Host(`b`)) && Path(`/c`)").unwrap();
+        let rule = parse_rule("(Host(`a`) || Host(`b`)) && Path(`/c`)").unwrap();
         assert_eq!(
             rule,
             Rule::And(
@@ -349,7 +370,7 @@ mod tests {
 
     #[test]
     fn and_is_left_associative() {
-        let rule = Rule::parse("Host(`a`) && Host(`b`) && Host(`c`)").unwrap();
+        let rule = parse_rule("Host(`a`) && Host(`b`) && Host(`c`)").unwrap();
         assert_eq!(
             rule,
             Rule::And(
@@ -364,7 +385,7 @@ mod tests {
 
     #[test]
     fn negated_group() {
-        let rule = Rule::parse("!(Host(`a`) || Host(`b`))").unwrap();
+        let rule = parse_rule("!(Host(`a`) || Host(`b`))").unwrap();
         assert_eq!(
             rule,
             Rule::Not(Box::new(Rule::Or(
@@ -383,9 +404,9 @@ mod tests {
             "!(Host(`a`) || Host(`b`))",
             "Header(`X-Foo`, `bar`)",
         ] {
-            let rule = Rule::parse(input).unwrap();
+            let rule = parse_rule(input).unwrap();
             let rendered = rule.to_string();
-            let reparsed = Rule::parse(&rendered).unwrap();
+            let reparsed = parse_rule(&rendered).unwrap();
             assert_eq!(
                 rule, reparsed,
                 "round trip failed for {input:?} -> {rendered:?}"
@@ -395,11 +416,11 @@ mod tests {
 
     #[test]
     fn errors_on_garbage() {
-        assert!(Rule::parse("Host(`a`) &&").is_err());
-        assert!(Rule::parse("Host(`a`").is_err());
-        assert!(Rule::parse("Host`a`)").is_err());
-        assert!(Rule::parse("Host(`a`) Host(`b`)").is_err());
-        assert!(Rule::parse("").is_err());
-        assert!(Rule::parse("Host('a')").is_err()); // single quotes not allowed
+        assert!(parse_rule("Host(`a`) &&").is_err());
+        assert!(parse_rule("Host(`a`").is_err());
+        assert!(parse_rule("Host`a`)").is_err());
+        assert!(parse_rule("Host(`a`) Host(`b`)").is_err());
+        assert!(parse_rule("").is_err());
+        assert!(parse_rule("Host('a')").is_err()); // single quotes not allowed
     }
 }

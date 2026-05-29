@@ -34,6 +34,10 @@ impl Route {
         self.priority_override
             .unwrap_or(self.match_rule.len() as i64)
     }
+
+    pub fn match_request(&self, url: &url::Url) -> bool {
+        todo!()
+    }
 }
 
 impl Display for Route {
