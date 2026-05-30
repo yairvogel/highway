@@ -31,34 +31,38 @@ pub enum Rule {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Matcher {
-    Host { host: String },
-    Path { path: String },
-    PathPrefix { path: String },
-    PathRegexp { pattern: String },
+    Host(String),
+    Path(String),
+    PathPrefix(String),
+    PathRegexp(String),
 }
 
 impl Display for Matcher {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Matcher::Host { host } => write!(f, "Host(`{host}`)"),
-            Matcher::Path { path } => write!(f, "Path(`{path}`)"),
-            Matcher::PathPrefix { path } => write!(f, "PathPrefix(`{path}`)"),
-            Matcher::PathRegexp { pattern } => write!(f, "PathRegexp(`{pattern}`)"),
+            Matcher::Host(host) => write!(f, "Host(`{host}`)"),
+            Matcher::Path(path) => write!(f, "Path(`{path}`)"),
+            Matcher::PathPrefix(path) => write!(f, "PathPrefix(`{path}`)"),
+            Matcher::PathRegexp(pattern) => write!(f, "PathRegexp(`{pattern}`)"),
         }
     }
 }
 
 impl Matcher {
+    pub(crate) fn into_rule(self) -> Rule {
+        Rule::Matcher(self)
+    }
+
     fn match_request(&self, request: &Request) -> bool {
         let url = &request.url;
         match self {
-            Matcher::Host { host } => url
+            Matcher::Host(host) => url
                 .host()
                 .map(|h| host == &h.to_string())
                 .unwrap_or_default(),
-            Matcher::Path { path } => url.path() == path,
-            Matcher::PathPrefix { path } => url.path().starts_with(path),
-            Matcher::PathRegexp { pattern } => {
+            Matcher::Path(path) => url.path() == path,
+            Matcher::PathPrefix(path) => url.path().starts_with(path),
+            Matcher::PathRegexp(pattern) => {
                 let re = regex::Regex::new(&pattern).expect("malformed regex");
                 re.is_match(url.path())
             }
