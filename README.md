@@ -1,6 +1,6 @@
 # highway
 
-[![CI](https://github.com/yairvogel/highway/actions/workflows/ci.yml/badge.svg)](https://github.com/yairvogel/highway/actions/workflows/ci.yml)
+[![Tests](https://github.com/yairvogel/highway/actions/workflows/tests.yml/badge.svg)](https://github.com/yairvogel/highway/actions/workflows/tests.yml)
 
 A small CLI for inspecting [Traefik](https://traefik.io/) routing in a Kubernetes
 cluster. `highway` reads the `IngressRoute` resources from your current cluster
