@@ -35,6 +35,7 @@ pub enum Matcher {
     Path(String),
     PathPrefix(String),
     PathRegexp(String),
+    Method(String),
 }
 
 impl Display for Matcher {
@@ -44,15 +45,12 @@ impl Display for Matcher {
             Matcher::Path(path) => write!(f, "Path(`{path}`)"),
             Matcher::PathPrefix(path) => write!(f, "PathPrefix(`{path}`)"),
             Matcher::PathRegexp(pattern) => write!(f, "PathRegexp(`{pattern}`)"),
+            Matcher::Method(method) => write!(f, "Method(`{method}`)"),
         }
     }
 }
 
 impl Matcher {
-    pub(crate) fn into_rule(self) -> Rule {
-        Rule::Matcher(self)
-    }
-
     fn match_request(&self, request: &Request) -> bool {
         let url = &request.url;
         match self {
@@ -66,6 +64,7 @@ impl Matcher {
                 let re = regex::Regex::new(&pattern).expect("malformed regex");
                 re.is_match(url.path())
             }
+            Matcher::Method(method) => &request.method == method,
         }
     }
 }
@@ -128,4 +127,5 @@ impl Display for Rule {
 
 pub struct Request {
     pub url: url::Url,
+    pub method: String,
 }

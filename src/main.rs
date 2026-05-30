@@ -37,6 +37,8 @@ enum Commands {
     List,
     Match {
         url: String,
+        #[arg(short = 'X', long, default_value = "GET")]
+        method: String,
     },
 }
 
@@ -70,13 +72,13 @@ fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     match args.command {
         Commands::List => list_routes(&routes),
-        Commands::Match { url } => match_routes(&routes, url)?,
+        Commands::Match { url, method } => match_routes(&routes, url, method)?,
     }
 
     Ok(())
 }
 
-fn match_routes(routes: &[NamedRoute], url: String) -> anyhow::Result<()> {
+fn match_routes(routes: &[NamedRoute], url: String, method: String) -> anyhow::Result<()> {
     let url = match Url::parse(&url) {
         Ok(url) => url,
         Err(e) => {
@@ -85,14 +87,24 @@ fn match_routes(routes: &[NamedRoute], url: String) -> anyhow::Result<()> {
         }
     };
 
-    let request = Request { url };
+    let request = Request { url, method };
     for route in routes.iter() {
         if parse_rule(&route.route.match_rule)?.match_request(&request) {
             println!(
                 "{}: {}",
                 route.name,
-                parse_rule(&route.route.match_rule).unwrap()
+                route
+                    .route
+                    .services
+                    .as_ref()
+                    .unwrap()
+                    .iter()
+                    .next()
+                    .unwrap()
+                    .name
+                    .as_str()
             );
+            break;
         }
     }
 

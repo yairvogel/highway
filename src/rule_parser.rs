@@ -230,6 +230,9 @@ impl Parser {
                 let args = self.parse_args()?;
                 let matcher_enum = match name.as_str() {
                     "Host" => {
+                        if args.len() != 1 {
+                            eprintln!("unexpected num of args: {:?}", args)
+                        }
                         assert!(args.len() == 1);
                         Matcher::Host(args.into_iter().next().unwrap())
                     }
@@ -245,7 +248,14 @@ impl Parser {
                         assert!(args.len() == 1);
                         Matcher::PathRegexp(args.into_iter().next().unwrap())
                     }
-                    _ => unimplemented!(),
+                    "Method" => {
+                        assert!(args.len() == 1);
+                        Matcher::Method(args.into_iter().next().unwrap())
+                    }
+                    other => {
+                        eprintln!("{other} is not supported");
+                        unimplemented!();
+                    }
                 };
 
                 Ok(Rule::Matcher(matcher_enum))
@@ -314,10 +324,14 @@ mod tests {
         Rule::And(Box::new(a), Box::new(b))
     }
 
+    fn make_rule(matcher: Matcher) -> Rule {
+        Rule::Matcher(matcher)
+    }
+
     #[test]
     fn single_matcher() {
         let rule = parse_rule("Host(`example.com`)").unwrap();
-        assert_eq!(rule, Matcher::Host("example.com".to_string()).into_rule());
+        assert_eq!(rule, make_rule(Matcher::Host("example.com".to_string())));
     }
 
     // #[test]
@@ -329,7 +343,7 @@ mod tests {
     #[test]
     fn escaped_double_quote_values() {
         let rule = parse_rule(r#"Host("example.com")"#).unwrap();
-        assert_eq!(rule, Matcher::Host("example.com".to_string()).into_rule());
+        assert_eq!(rule, make_rule(Matcher::Host("example.com".to_string())));
 
         // let rule = parse_rule(r#"Header("X", "a\"b")"#).unwrap();
         // assert_eq!(rule, matcher("Header", &["X", "a\"b"]));
@@ -338,7 +352,7 @@ mod tests {
     #[test]
     fn negation() {
         let rule = parse_rule("!Path(`/foo`)").unwrap();
-        assert_eq!(rule, not(Matcher::Path("/foo".to_string()).into_rule()));
+        assert_eq!(rule, not(make_rule(Matcher::Path("/foo".to_string()))));
     }
 
     #[test]
@@ -348,10 +362,10 @@ mod tests {
         assert_eq!(
             rule,
             or(
-                Matcher::Host("a".to_string()).into_rule(),
+                make_rule(Matcher::Host("a".to_string())),
                 and(
-                    Matcher::Host("b".to_string()).into_rule(),
-                    Matcher::Path("/c".to_string()).into_rule()
+                    make_rule(Matcher::Host("b".to_string())),
+                    make_rule(Matcher::Path("/c".to_string()))
                 )
             )
         );
@@ -364,10 +378,10 @@ mod tests {
             rule,
             and(
                 or(
-                    Matcher::Host("a".to_string()).into_rule(),
-                    Matcher::Host("b".to_string()).into_rule()
+                    make_rule(Matcher::Host("a".to_string())),
+                    make_rule(Matcher::Host("b".to_string()))
                 ),
-                Matcher::Path("/c".to_string()).into_rule()
+                make_rule(Matcher::Path("/c".to_string()))
             )
         );
     }
@@ -379,10 +393,10 @@ mod tests {
             rule,
             and(
                 and(
-                    Matcher::Host("a".to_string()).into_rule(),
-                    Matcher::Host("b".to_string()).into_rule(),
+                    make_rule(Matcher::Host("a".to_string())),
+                    make_rule(Matcher::Host("b".to_string())),
                 ),
-                Matcher::Host("c".to_string()).into_rule()
+                make_rule(Matcher::Host("c".to_string()))
             )
         );
     }
@@ -393,8 +407,8 @@ mod tests {
         assert_eq!(
             rule,
             not(or(
-                Matcher::Host("a".to_string()).into_rule(),
-                Matcher::Host("b".to_string()).into_rule()
+                make_rule(Matcher::Host("a".to_string())),
+                make_rule(Matcher::Host("b".to_string()))
             ))
         );
     }
